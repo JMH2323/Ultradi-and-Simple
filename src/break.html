@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Break Reminder</title>
+    <style>
+        body {
+            background-color: var(--break-color, #6b231b);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            color: white;
+            font-family: Arial, sans-serif;
+            flex-direction: column;
+        }
+        .short-break { --break-color: #e97c1d; }
+        .long-break { --break-color: #6b231b; }
+        .info {
+            position: absolute;
+            bottom: 10px;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Time for a <span id="break-type"></span> break!</h1>
+    <script>
+        // Set the text and color based on the window title (short or long break)
+        document.getElementById('break-type').textContent = 
+            document.title.split(' ')[0].toLowerCase();
+        document.body.classList.add(
+            document.title.split(' ')[0].toLowerCase() + '-break'
+        );
+    </script>
+    <div class="info">Press Ctrl+S to skip this break, or Ctrl+X to delay it one minute</div>
+    <script src="renderer.js"></script>
+</body>
+</html>

@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ultradi and Simple Settings</title>
+    <style>
+        body {
+            background-color: #085e2e;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            color: white;
+            font-family: Arial, sans-serif;
+            flex-direction: column;
+        }
+
+        .container {
+            width: 300px;
+            background-color: #0a4d23;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+        }
+
+        .title {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .input-group {
+            margin: 15px 0;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+
+        input[type="number"] {
+            width: 50px;
+            margin-right: 5px;
+            padding: 5px;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+        }
+
+        input[type="checkbox"] {
+            margin-right: 10px;
+        }
+
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            margin: 15px 0;
+        }
+
+        .guidance {
+            font-size: 12px;
+            color: #ccc;
+            margin: 10px 0;
+            text-align: center;
+        }
+
+        button {
+            width: 100%;
+            padding: 10px;
+            background-color: #16a085;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            background-color: #138d75;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1 class="title">Ultradi and Simple Settings</h1>
+        <div class="input-group">
+            <label for="short-break-interval">Short Break Interval:</label>
+            <input type="number" id="short-break-interval-hours" placeholder="HH" min="0">
+            <input type="number" id="short-break-interval-minutes" placeholder="MM" min="1">
+            <input type="number" id="short-break-interval-seconds" placeholder="SS" min="0">
+        </div>
+        <div class="input-group">
+            <label for="short-break-duration">Short Break Duration:</label>
+            <input type="number" id="short-break-duration-hours" placeholder="HH" min="0">
+            <input type="number" id="short-break-duration-minutes" placeholder="MM" min="0">
+            <input type="number" id="short-break-duration-seconds" placeholder="SS" min="1">
+        </div>
+        <div class="checkbox-group">
+            <input type="checkbox" id="use-long-breaks">
+            <label for="use-long-breaks">Use Long Breaks?</label>
+        </div>
+        <div class="input-group">
+            <label for="long-break-interval">Long Break Interval:</label>
+            <input type="number" id="long-break-interval-hours" placeholder="HH" min="0">
+            <input type="number" id="long-break-interval-minutes" placeholder="MM" min="2">
+            <input type="number" id="long-break-interval-seconds" placeholder="SS" min="0">
+        </div>
+        <div class="input-group">
+            <label for="long-break-duration">Long Break Duration:</label>
+            <input type="number" id="long-break-duration-hours" placeholder="HH" min="0">
+            <input type="number" id="long-break-duration-minutes" placeholder="MM" min="0">
+            <input type="number" id="long-break-duration-seconds" placeholder="SS" min="1">
+        </div>
+        <div class="guidance">
+            Minimum time for Short intervals is 1 minute, Long intervals 2 minutes.
+        </div>
+        <button id="save-settings">Save Settings</button>
+    </div>
+    <script>
+        const { ipcRenderer } = require('electron');
+
+        // Function to toggle long break settings
+        function toggleLongBreakSettings(enabled) {
+            const longBreakFields = [
+                'long-break-interval-hours',
+                'long-break-interval-minutes',
+                'long-break-interval-seconds',
+                'long-break-duration-hours',
+                'long-break-duration-minutes',
+                'long-break-duration-seconds'
+            ];
+
+            longBreakFields.forEach(id => {
+                const field = document.getElementById(id);
+                field.disabled = !enabled;
+                field.style.opacity = enabled ? 1 : 0.5;
+            });
+        }
+
+        // Function to populate input fields with saved settings
+        function initializeSettings(settings) {
+            document.getElementById('short-break-interval-hours').value = Math.floor(settings.shortBreak.interval / 3600000) || 0;
+            document.getElementById('short-break-interval-minutes').value = Math.floor((settings.shortBreak.interval % 3600000) / 60000) || 0;
+            document.getElementById('short-break-interval-seconds').value = Math.floor((settings.shortBreak.interval % 60000) / 1000) || 0;
+
+            document.getElementById('short-break-duration-hours').value = Math.floor(settings.shortBreak.duration / 3600000) || 0;
+            document.getElementById('short-break-duration-minutes').value = Math.floor((settings.shortBreak.duration % 3600000) / 60000) || 0;
+            document.getElementById('short-break-duration-seconds').value = Math.floor((settings.shortBreak.duration % 60000) / 1000) || 0;
+
+            document.getElementById('long-break-interval-hours').value = Math.floor(settings.longBreak.interval / 3600000) || 0;
+            document.getElementById('long-break-interval-minutes').value = Math.floor((settings.longBreak.interval % 3600000) / 60000) || 0;
+            document.getElementById('long-break-interval-seconds').value = Math.floor((settings.longBreak.interval % 60000) / 1000) || 0;
+
+            document.getElementById('long-break-duration-hours').value = Math.floor(settings.longBreak.duration / 3600000) || 0;
+            document.getElementById('long-break-duration-minutes').value = Math.floor((settings.longBreak.duration % 3600000) / 60000) || 0;
+            document.getElementById('long-break-duration-seconds').value = Math.floor((settings.longBreak.duration % 60000) / 1000) || 0;
+
+            const useLongBreaksCheckbox = document.getElementById('use-long-breaks');
+            useLongBreaksCheckbox.checked = settings.useLongBreaks;
+            toggleLongBreakSettings(settings.useLongBreaks);
+        }
+
+        // Listen for checkbox toggle
+        document.getElementById('use-long-breaks').addEventListener('change', (event) => {
+            const isChecked = event.target.checked;
+            toggleLongBreakSettings(isChecked);
+        });
+
+        // Save settings when the button is clicked
+        document.getElementById('save-settings').addEventListener('click', () => {
+            const newSettings = {
+                useLongBreaks: document.getElementById('use-long-breaks').checked,
+                shortBreakHours: parseInt(document.getElementById('short-break-interval-hours').value) || 0,
+                shortBreakMinutes: parseInt(document.getElementById('short-break-interval-minutes').value) || 0,
+                shortBreakSeconds: parseInt(document.getElementById('short-break-interval-seconds').value) || 0,
+                shortBreakDurationHours: parseInt(document.getElementById('short-break-duration-hours').value) || 0,
+                shortBreakDurationMinutes: parseInt(document.getElementById('short-break-duration-minutes').value) || 0,
+                shortBreakDurationSeconds: parseInt(document.getElementById('short-break-duration-seconds').value) || 0,
+                longBreakHours: parseInt(document.getElementById('long-break-interval-hours').value) || 0,
+                longBreakMinutes: parseInt(document.getElementById('long-break-interval-minutes').value) || 0,
+                longBreakSeconds: parseInt(document.getElementById('long-break-interval-seconds').value) || 0,
+                longBreakDurationHours: parseInt(document.getElementById('long-break-duration-hours').value) || 0,
+                longBreakDurationMinutes: parseInt(document.getElementById('long-break-duration-minutes').value) || 0,
+                longBreakDurationSeconds: parseInt(document.getElementById('long-break-duration-seconds').value) || 0,
+            };
+
+            console.log('Saving settings:', newSettings);
+
+            // Send the updated settings to the main process
+            ipcRenderer.send('update-settings', newSettings);
+        });
+
+        // Request saved settings from the main process
+        ipcRenderer.invoke('get-settings').then((settings) => {
+            console.log('Initializing settings:', settings);
+            initializeSettings(settings);
+        }).catch((error) => {
+            console.error('Failed to load settings:', error);
+        });
+    </script>
+</body>
+
+</html>

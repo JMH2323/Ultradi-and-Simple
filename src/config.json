@@ -1,0 +1,11 @@
+{
+  "shortBreak": {
+    "interval": 1200000,
+    "duration": 20000
+  },
+  "longBreak": {
+    "interval": 5400000,
+    "duration": 900000
+  },
+  "useLongBreaks": true
+}

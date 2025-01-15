@@ -1,0 +1,16 @@
+{
+    "name": "ultradiandsimple",
+    "version": "1.0.0",
+    "description": "An Electron app to block off the screen during break reminders",
+    "main": "src/main.js",
+    "scripts": {
+        "start": "electron ."
+    },
+    "dependencies": {
+        "@electron/remote": "^2.0.10",
+        "electron": "^25.0.0",
+        "electron-store": "^10.0.0"
+    },
+    "author": "John Haley-Clay",
+    "license": "MIT"
+}
