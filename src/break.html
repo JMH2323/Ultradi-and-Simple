@@ -23,6 +23,19 @@
             bottom: 10px;
             font-size: 14px;
         }
+        #progress-bar {
+            width: 80%;
+            height: 10px; /* Thinner height */
+            background-color: #888;
+            border-radius: 5px; /* Adjusted for thinner height */
+            overflow: hidden;
+        }
+        #progress {
+            width: 0%;
+            height: 100%;
+            background-color: #fff;
+            border-radius: 5px; /* Adjusted for thinner height */
+        }
     </style>
 </head>
 <body>
@@ -36,6 +49,37 @@
         );
     </script>
     <div class="info">Press Ctrl+S to skip this break, or Ctrl+X to delay it one minute</div>
-    <script src="renderer.js"></script>
+    <div id="timer">Time remaining: <span id="countdown"></span></div>
+    <div id="progress-bar">
+        <div id="progress"></div>
+    </div>
+    <script>
+        const { ipcRenderer } = require('electron');
+        ipcRenderer.on('start-timer', (event, totalDuration) => {
+            console.log('start-timer event data:', totalDuration); // Check if empty
+            let timeLeft = totalDuration;
+            const countdownEl = document.getElementById('countdown');
+            const progressEl = document.getElementById('progress');
+            const startTime = Date.now();
+
+            // Update immediately
+            countdownEl.textContent = Math.ceil(timeLeft / 1000) + 's';
+            progressEl.style.width = '0%';
+
+            const timerId = setInterval(() => {
+                const elapsedTime = Date.now() - startTime;
+                timeLeft = totalDuration - elapsedTime;
+                if (timeLeft < 0) {
+                    clearInterval(timerId);
+                    countdownEl.textContent = '0s';
+                    progressEl.style.width = '100%';
+                    return;
+                }
+                const pct = (elapsedTime / totalDuration) * 100;
+                progressEl.style.width = pct + '%';
+                countdownEl.textContent = Math.ceil(timeLeft / 1000) + 's';
+            }, 25);
+        });
+    </script>
 </body>
 </html>
