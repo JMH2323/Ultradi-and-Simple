@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, globalShortcut, Notification, Tray, Menu } = require('electron');
+const { app, BrowserWindow, ipcMain, globalShortcut, Notification, Tray, Menu, screen } = require('electron');
 const remoteMain = require('@electron/remote/main');
 const path = require('path');
 const { loadSettings, saveSettings } = require('./settings'); 
@@ -8,11 +8,12 @@ remoteMain.initialize();
 // Break type constants
 const BREAK_TYPES = {
   SHORT: 'short',
-  LONG: 'long'
+  LONG: 'long',
+  MANUAL: 'manual'
 };
 
 let mainWindow;
-let breakWindow;
+let breakWindows = [];
 let shortBreakIntervalId;
 let longBreakIntervalId;
 let tray;
@@ -29,9 +30,10 @@ function createMainWindow() {
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false,
-      enableRemoteModule: true // Enable remote module
+      enableRemoteModule: true
     },
     show: false, // Start hidden
+    icon: path.join(__dirname, 'bin/assets/UAR-Tray.png'),
     title: 'Ultradi and Simple Settings'
   });
 
@@ -41,15 +43,7 @@ function createMainWindow() {
 
   // Register local shortcuts for the main window
   mainWindow.webContents.on('before-input-event', (event, input) => {
-    if (input.control && input.key.toLowerCase() === 's') {
-      console.log('Skip break triggered');
-      skipBreak();
-      event.preventDefault();
-    } else if (input.control && input.key.toLowerCase() === 'x') {
-      console.log('Postpone break triggered');
-      postponeBreak();
-      event.preventDefault();
-    } else if (input.control && input.alt && input.key.toLowerCase() === 'v') {
+    if (input.control && input.alt && input.key.toLowerCase() === 'v') {
       console.log('Manual short break triggered');
       showBreakNotification(BREAK_TYPES.SHORT);
       setTimeout(() => createBreakWindow(BREAK_TYPES.SHORT), 10000);
@@ -58,6 +52,10 @@ function createMainWindow() {
       console.log('Manual long break triggered');
       showBreakNotification(BREAK_TYPES.LONG);
       setTimeout(() => createBreakWindow(BREAK_TYPES.LONG), 10000);
+      event.preventDefault();
+    } else if (input.control && input.alt && input.key.toLowerCase() === 'n') {
+      console.log('Manual break triggered');      
+      createManualBreakWindow();
       event.preventDefault();
     }
   });
@@ -72,7 +70,7 @@ function createMainWindow() {
   });
 
   // Create tray icon and menu
-  tray = new Tray(path.join(__dirname, 'icon.png')); // Ensure you have an icon.png in your project directory
+  tray = new Tray(path.join(__dirname, '../assets/UAR-Tray.png')); 
   const contextMenu = Menu.buildFromTemplate([
     { label: 'Show App', click: () => mainWindow.show() },
     { label: 'Quit', click: () => {
@@ -89,75 +87,151 @@ function createMainWindow() {
   });
 }
 
-// Create a break window based on the break type
+// Create break windows for each display
 function createBreakWindow(breakType) {
   try {
-    console.log(`Creating ${breakType} break window`);
+    console.log(`Creating ${breakType} break windows`);
 
-    // Create new break window first
-    breakWindow = new BrowserWindow({
-      width: 800,
-      height: 600,
-      frame: false,
-      alwaysOnTop: true,
-      webPreferences: {
-        nodeIntegration: true,
-        contextIsolation: false,
-      },
-      title: `${breakType.charAt(0).toUpperCase() + breakType.slice(1)} Break`
+    // Unregister existing global shortcuts to avoid conflicts
+    globalShortcut.unregister('Control+S');
+    globalShortcut.unregister('Control+X');
+
+    // Get all displays of user
+    const displays = screen.getAllDisplays();
+
+    // Create a break window for each display based on screen
+    displays.forEach((display) => {
+      const { width, height, x, y } = display.bounds;
+
+      const breakWindow = new BrowserWindow({
+        x: x,
+        y: y,
+        width: width,
+        height: height,
+        frame: false,
+        alwaysOnTop: true,
+        transparent: true,
+        webPreferences: {
+          nodeIntegration: true,
+          contextIsolation: false,
+        },
+        skipTaskbar: true,
+        title: `${breakType.charAt(0).toUpperCase() + breakType.slice(1)} Break`
+      });
+
+      breakWindow.breakType = breakType;
+      remoteMain.enable(breakWindow.webContents);
+      breakWindow.loadFile('src/break.html');
+
+      // Now safely access 'webContents'
+      breakWindow.webContents.on('did-finish-load', () => {
+        if (breakType !== BREAK_TYPES.MANUAL) {
+          breakWindow.webContents.send('start-timer', settings[`${breakType}Break`].duration);
+        }
+      });
+
+      // Register global shortcuts for the break window
+      globalShortcut.register('Control+S', () => {
+        console.log('Skip break triggered');
+        skipBreak();
+      });
+
+      globalShortcut.register('Control+X', () => {
+        console.log('Postpone break triggered');
+        postponeBreak();
+      });
+
+      // Unregister global shortcuts 1 second before the break window is closed to prevent deleted object references
+      const unregisterShortcutsTimeout = setTimeout(() => {
+        globalShortcut.unregister('Control+S');
+        globalShortcut.unregister('Control+X');
+      }, settings[`${breakType}Break`].duration - 1000);
+
+      // Auto-close after duration
+      const autoCloseTimeout = setTimeout(() => {
+        if (breakWindow) {
+          breakWindow.close();
+        }
+      }, settings[`${breakType}Break`].duration);
+
+      // Unregister global shortcuts and clear timeouts when the break window is closed
+      breakWindow.on('closed', () => {
+        clearTimeout(unregisterShortcutsTimeout);
+        clearTimeout(autoCloseTimeout);
+        globalShortcut.unregister('Control+S');
+        globalShortcut.unregister('Control+X');
+        breakWindows = breakWindows.filter(win => win !== breakWindow);
+      });
+
+      breakWindows.push(breakWindow);
     });
-
-    breakWindow.breakType = breakType;
-    remoteMain.enable(breakWindow.webContents);
-    breakWindow.loadFile('src/break.html');
-
-    // Now safely access 'webContents'
-    breakWindow.webContents.on('did-finish-load', () => {
-      breakWindow.webContents.send('start-timer', settings[`${breakType}Break`].duration);
-    });
-
-    // Handle existing break window
-    if (breakWindow) {
-      if (breakWindow.breakType === BREAK_TYPES.LONG) {
-        console.log('Long break in progress, skipping new break');
-        return;
-      }
-      if (breakType === BREAK_TYPES.LONG) {
-        console.log('Closing short break for long break');
-        breakWindow.close();
-        breakWindow = null;
-      }
-    }
-
-    // Register global shortcuts for the break window
-    globalShortcut.register('Control+S', () => {
-      console.log('Skip break triggered');
-      skipBreak();
-    });
-
-    globalShortcut.register('Control+X', () => {
-      console.log('Postpone break triggered');
-      postponeBreak();
-    });
-
-    // Unregister global shortcuts when the break window is closed
-    breakWindow.on('closed', () => {
-      globalShortcut.unregister('Control+S');
-      globalShortcut.unregister('Control+X');
-      breakWindow = null;
-    });
-
-    // Auto-close after duration
-    setTimeout(() => {
-      if (breakWindow) {
-        breakWindow.close();
-      }
-    }, settings[`${breakType}Break`].duration);
 
   } catch (error) {
-    console.error(`Failed to create ${breakType} break window:`, error);
+    console.error(`Failed to create ${breakType} break windows:`, error);
   }
 }
+
+// Create manual break windows for each display
+function createManualBreakWindow() {
+  try {
+    console.log('Creating manual break windows');
+
+    // Get all displays of user
+    const displays = screen.getAllDisplays();
+
+    // Create a break window for each display based on screen
+    displays.forEach((display) => {
+      const { width, height, x, y } = display.bounds;
+
+      const breakWindow = new BrowserWindow({
+        x: x,
+        y: y,
+        width: width,
+        height: height,
+        frame: false,
+        alwaysOnTop: true,
+        transparent: true,
+        webPreferences: {
+          nodeIntegration: true,
+          contextIsolation: false,
+        },
+        skipTaskbar: true,
+        title: 'Manual Break'
+      });
+
+      breakWindow.breakType = BREAK_TYPES.MANUAL;
+      remoteMain.enable(breakWindow.webContents);
+      breakWindow.loadFile('src/manual.html');
+
+      // Unregister global shortcuts and clear timeouts when the break window is closed
+      breakWindow.on('closed', () => {
+        breakWindows = breakWindows.filter(win => win !== breakWindow);
+      });
+
+      breakWindows.push(breakWindow);
+    });
+
+  } catch (error) {
+    console.error('Failed to create manual break windows:', error);
+  }
+}
+
+// Handle end break event
+ipcMain.on('end-break', () => {
+  breakWindows.forEach(win => {
+    if (win) {
+      console.log(`Ending ${win.breakType} break`);
+      win.close();
+    }
+  });
+  breakWindows = [];
+});
+
+// Manual Break Event
+ipcMain.on('start-manual-break', () => {
+  console.log('Manual break triggered from button');
+  createManualBreakWindow(); 
+});
 
 // Show a notification for an upcoming break
 function showBreakNotification(breakType) {
@@ -170,31 +244,29 @@ function showBreakNotification(breakType) {
 
 // Skip the current break
 function skipBreak() {
-  if (breakWindow) {
-    console.log(`Skipping ${breakWindow.breakType} break`);
-    breakWindow.close();
-    breakWindow = null;
-  }
+  breakWindows.forEach(win => {
+    if (win) {
+      console.log(`Skipping ${win.breakType} break`);
+      win.close();
+    }
+  });
+  breakWindows = [];
 }
 
 // Postpone the current break by one minute
 function postponeBreak() {
-  if (breakWindow) {
-    console.log(`Postponing ${breakWindow.breakType} break by one minute`);
-    let bIsShortBreak = breakWindow.breakType === "short";
-    breakWindow.close();
-    breakWindow = null;
-    setTimeout(() => {
-        if (bIsShortBreak && !breakWindow) {            
-                showBreakNotification(BREAK_TYPES.SHORT);
-                setTimeout(() => createBreakWindow(BREAK_TYPES.SHORT), 10000);
-        }
-        else if (!bIsShortBreak && !breakWindow) {            
-            showBreakNotification(BREAK_TYPES.LONG);
-            setTimeout(() => createBreakWindow(BREAK_TYPES.LONG), 10000);
-        }
-    }, 50000); // 50 seconds to account for the 10 second notification
-  }
+  let bIsShortBreak = false;
+  breakWindows.forEach(win => {
+    if (win) {
+      console.log(`Postponing ${win.breakType} break by one minute`);
+      bIsShortBreak = win.breakType === "short";
+      win.close();
+    }
+  });
+  breakWindows = [];
+  setTimeout(() => {
+    createBreakWindow(bIsShortBreak ? BREAK_TYPES.SHORT : BREAK_TYPES.LONG);
+  }, 50000); // 50 seconds to account for the 10 second notification
 }
 
 // Set intervals for short and long breaks
@@ -205,7 +277,7 @@ function setBreakIntervals() {
 
   // Set short break interval
   shortBreakIntervalId = setInterval(() => {
-    if (!breakWindow) {
+    if (!breakWindows.length) {
       showBreakNotification(BREAK_TYPES.SHORT);
       setTimeout(() => createBreakWindow(BREAK_TYPES.SHORT), 10000);
     }

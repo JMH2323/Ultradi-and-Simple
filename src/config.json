@@ -5,7 +5,7 @@
   },
   "longBreak": {
     "interval": 5400000,
-    "duration": 900000
+    "duration": 5000
   },
   "useLongBreaks": true
 }

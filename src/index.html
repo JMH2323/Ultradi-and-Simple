@@ -118,6 +118,7 @@
         <div class="guidance">
             Minimum time for Short intervals is 1 minute, Long intervals 2 minutes.
         </div>
+        <button id="start-manual-break">Start Manual Break</button> <!-- button for manual breaks -->
         <button id="save-settings">Save Settings</button>
     </div>
     <script>
@@ -192,6 +193,12 @@
 
             // Send the updated settings to the main process
             ipcRenderer.send('update-settings', newSettings);
+        });
+
+        // Event listener for the manual break button
+        document.getElementById('start-manual-break').addEventListener('click', () => {
+            console.log('Manual break button clicked');
+            ipcRenderer.send('start-manual-break');
         });
 
         // Request saved settings from the main process
