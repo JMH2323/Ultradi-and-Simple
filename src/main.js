@@ -55,7 +55,7 @@ function createMainWindow() {
       event.preventDefault();
     } else if (input.control && input.alt && input.key.toLowerCase() === 'n') {
       console.log('Manual break triggered');      
-      createManualBreakWindow();
+      createManualBreakSetupWindow();
       event.preventDefault();
     }
   });
@@ -88,8 +88,10 @@ function createMainWindow() {
 }
 
 // Create break windows for each display
-function createBreakWindow(breakType) {
-  try {
+function createBreakWindow(breakType) 
+{
+  try 
+  {
     console.log(`Creating ${breakType} break windows`);
 
     // Unregister existing global shortcuts to avoid conflicts
@@ -103,76 +105,118 @@ function createBreakWindow(breakType) {
     displays.forEach((display) => {
       const { width, height, x, y } = display.bounds;
 
-      const breakWindow = new BrowserWindow({
-        x: x,
-        y: y,
-        width: width,
-        height: height,
-        frame: false,
-        alwaysOnTop: true,
-        transparent: true,
-        webPreferences: {
-          nodeIntegration: true,
-          contextIsolation: false,
-        },
-        skipTaskbar: true,
-        title: `${breakType.charAt(0).toUpperCase() + breakType.slice(1)} Break`
-      });
+      const breakWindow = new BrowserWindow(
+        {
+          x: x,
+          y: y,
+          width: width,
+          height: height,
+          frame: false,
+          alwaysOnTop: true,
+          transparent: true,
+          webPreferences: 
+          {
+            nodeIntegration: true,
+            contextIsolation: false,
+          },
+          skipTaskbar: true,
+          title: `${breakType.charAt(0).toUpperCase() + breakType.slice(1)} Break`
+        });
 
       breakWindow.breakType = breakType;
       remoteMain.enable(breakWindow.webContents);
-      breakWindow.loadFile('src/break.html');
+      // Load different HTML files based on break type
+      if (breakType === BREAK_TYPES.SHORT) breakWindow.loadFile('src/short.html');
+      else if (breakType === BREAK_TYPES.LONG) breakWindow.loadFile('src/long.html');
 
       // Now safely access 'webContents'
-      breakWindow.webContents.on('did-finish-load', () => {
-        if (breakType !== BREAK_TYPES.MANUAL) {
-          breakWindow.webContents.send('start-timer', settings[`${breakType}Break`].duration);
-        }
-      });
+      breakWindow.webContents.on('did-finish-load', () => 
+        {
+          if (breakType !== BREAK_TYPES.MANUAL) 
+            {
+              breakWindow.webContents.send('start-timer', settings[`${breakType}Break`].duration);
+            }
+        });
 
       // Register global shortcuts for the break window
-      globalShortcut.register('Control+S', () => {
-        console.log('Skip break triggered');
-        skipBreak();
-      });
+      globalShortcut.register('Control+S', () => 
+        {
+          console.log('Skip break triggered');
+          skipBreak();
+        });
 
-      globalShortcut.register('Control+X', () => {
-        console.log('Postpone break triggered');
-        postponeBreak();
+      globalShortcut.register('Control+X', () => 
+      {
+          console.log('Postpone break triggered');
+          postponeBreak();
       });
 
       // Unregister global shortcuts 1 second before the break window is closed to prevent deleted object references
-      const unregisterShortcutsTimeout = setTimeout(() => {
-        globalShortcut.unregister('Control+S');
-        globalShortcut.unregister('Control+X');
+      const unregisterShortcutsTimeout = setTimeout(() =>    
+      {
+         globalShortcut.unregister('Control+S');
+         globalShortcut.unregister('Control+X');
       }, settings[`${breakType}Break`].duration - 1000);
 
-      // Auto-close after duration
-      const autoCloseTimeout = setTimeout(() => {
-        if (breakWindow) {
-          breakWindow.close();
-        }
-      }, settings[`${breakType}Break`].duration);
+      if (breakType === BREAK_TYPES.SHORT)
+      {              
+        // Auto-close after duration
+        const autoCloseTimeout = setTimeout(() => 
+          {
+            if (breakWindow) breakWindow.close();
+            resetShortBreak();         
+          }, settings[`${breakType}Break`].duration);
+      }
+      
 
       // Unregister global shortcuts and clear timeouts when the break window is closed
-      breakWindow.on('closed', () => {
-        clearTimeout(unregisterShortcutsTimeout);
-        clearTimeout(autoCloseTimeout);
-        globalShortcut.unregister('Control+S');
-        globalShortcut.unregister('Control+X');
-        breakWindows = breakWindows.filter(win => win !== breakWindow);
-      });
+      breakWindow.on('closed', () => 
+        {
+          clearTimeout(unregisterShortcutsTimeout);
+          clearTimeout(autoCloseTimeout);
+          globalShortcut.unregister('Control+S');
+          globalShortcut.unregister('Control+X');
+          breakWindows = breakWindows.filter(win => win !== breakWindow);
+        });
 
       breakWindows.push(breakWindow);
     });
 
-  } catch (error) {
+  } catch (error) 
+  {
     console.error(`Failed to create ${breakType} break windows:`, error);
   }
 }
 
+// Create manual break setup window
+function createManualBreakSetupWindow() {
+  const setupWindow = new BrowserWindow({
+    width: 400,
+    height: 300,
+    webPreferences: {
+      nodeIntegration: true,
+      contextIsolation: false,
+    },
+    title: 'Manual Break Setup'
+  });
+
+  remoteMain.enable(setupWindow.webContents);
+  setupWindow.loadFile('src/popup.html');
+
+  setupWindow.webContents.on('did-finish-load', () => {
+    setupWindow.webContents.send('load-manual-break-message', settings.manualBreak);
+  });
+}
+
+// Handle manual break message submission
+ipcMain.on('manual-break-message', (event, { header, body }) => {
+  settings.manualBreak = { header, body };
+  saveSettings(settings);
+  createManualBreakWindow(header, body);
+});
+
 // Create manual break windows for each display
-function createManualBreakWindow() {
+function createManualBreakWindow(header, body) {
   try {
     console.log('Creating manual break windows');
 
@@ -203,6 +247,11 @@ function createManualBreakWindow() {
       remoteMain.enable(breakWindow.webContents);
       breakWindow.loadFile('src/manual.html');
 
+      // Send header and body to manual.html
+      breakWindow.webContents.on('did-finish-load', () => {
+        breakWindow.webContents.send('set-manual-break-message', { header, body });
+      });
+
       // Unregister global shortcuts and clear timeouts when the break window is closed
       breakWindow.on('closed', () => {
         breakWindows = breakWindows.filter(win => win !== breakWindow);
@@ -230,7 +279,7 @@ ipcMain.on('end-break', () => {
 // Manual Break Event
 ipcMain.on('start-manual-break', () => {
   console.log('Manual break triggered from button');
-  createManualBreakWindow(); 
+  createManualBreakSetupWindow(); 
 });
 
 // Show a notification for an upcoming break
@@ -247,13 +296,18 @@ function skipBreak() {
   breakWindows.forEach(win => {
     if (win) {
       console.log(`Skipping ${win.breakType} break`);
+      if (win.breakType === BREAK_TYPES.SHORT) {
+        resetShortBreak();
+      } else if (win.breakType === BREAK_TYPES.LONG) {
+        resetLongBreak();
+      }
       win.close();
     }
   });
   breakWindows = [];
 }
 
-// Postpone the current break by one minute
+// Postpone the current break by one minute with a notification
 function postponeBreak() {
   let bIsShortBreak = false;
   breakWindows.forEach(win => {
@@ -265,8 +319,40 @@ function postponeBreak() {
   });
   breakWindows = [];
   setTimeout(() => {
-    createBreakWindow(bIsShortBreak ? BREAK_TYPES.SHORT : BREAK_TYPES.LONG);
+    showBreakNotification(bIsShortBreak ? BREAK_TYPES.SHORT : BREAK_TYPES.LONG);
+    setTimeout(() => createBreakWindow(bIsShortBreak ? BREAK_TYPES.SHORT : BREAK_TYPES.LONG), 10000);
   }, 50000); // 50 seconds to account for the 10 second notification
+}
+
+// Function to reset short break interval
+function resetShortBreak() {
+  if (shortBreakIntervalId) clearInterval(shortBreakIntervalId);
+  shortBreakIntervalId = setInterval(() => {
+    if (!breakWindows.length) {
+      showBreakNotification(BREAK_TYPES.SHORT);
+      setTimeout(() => createBreakWindow(BREAK_TYPES.SHORT), 10000);
+    }
+  }, settings.shortBreak.interval);
+  console.log('Short break interval reset');
+}
+
+// Function to reset long break interval
+function resetLongBreak() {
+  if (longBreakIntervalId) clearInterval(longBreakIntervalId);
+  longBreakIntervalId = setInterval(() => {
+    if (!breakWindows.length) {
+      showBreakNotification(BREAK_TYPES.LONG);
+      setTimeout(() => createBreakWindow(BREAK_TYPES.LONG), 10000);
+    }
+  }, settings.longBreak.interval);
+  console.log('Long break interval reset');
+}
+
+// Placeholder for resetBothBreaks function
+function resetBothBreaks() {
+  resetShortBreak();
+  resetLongBreak();
+  console.log('Both break intervals reset');
 }
 
 // Set intervals for short and long breaks
@@ -353,6 +439,18 @@ ipcMain.on('update-settings', (event, newSettings) => {
 
 ipcMain.handle('get-settings', () => {
   return settings; // Return the current settings object
+});
+
+ipcMain.handle('get-manual-break-message', () => {
+  return settings.manualBreak;
+});
+
+// Add this listener in the main process
+ipcMain.on('close-popup-window', (event) => {
+  const window = BrowserWindow.fromWebContents(event.sender);
+  if (window) {
+      window.close();
+  }
 });
 
 // Initialize the application

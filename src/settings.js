@@ -14,7 +14,11 @@ const defaultSettings = {
         interval: (90 * 60000), // 90 minutes
         duration: (15 * 60000) // 15 minutes
     },
-    useLongBreaks: true
+    useLongBreaks: true,
+    manualBreak: {
+        header: 'Add Header Here',
+        body: 'Add Body Here'
+    }
 };
 
 // Load settings from config.json or use defaults

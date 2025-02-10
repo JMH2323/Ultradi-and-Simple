@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Manual Break</title>
+    <title>Manual Break Setup</title>
     <style>
         body {
             background-color: #2b3e50;
@@ -20,20 +20,15 @@
             width: 33%;
             text-align: center;
         }
-        #manual-break-header {
-            font-size: 24px;
-            margin-bottom: 20px;
-        }
-        #manual-break-body {
+        input, textarea {
             width: 100%;
-            height: 100px;
-            margin-top: 20px;
+            margin-top: 10px;
             padding: 10px;
             border-radius: 5px;
             border: 1px solid #ccc;
             font-size: 16px;
         }
-        #end-break-button {
+        button {
             margin-top: 20px;
             padding: 10px;
             background-color: #16a085;
@@ -44,29 +39,35 @@
             cursor: pointer;
             transition: background-color 0.3s;
         }
-        #end-break-button:hover {
+        button:hover {
             background-color: #138d75;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1 id="manual-break-header">Manual Break</h1>
-        <p id="manual-break-body"></p>
-        <button id="end-break-button">End break?</button>
+        <h1>Insert Your Message</h1>
+        <input id="header-input" type="text" placeholder="Header">
+        <textarea id="body-input" placeholder="Body"></textarea>
+        <button id="submit-button">Submit</button>
     </div>
     <script>
         const { ipcRenderer } = require('electron');
 
-        // Handle end break button click
-        document.getElementById('end-break-button').addEventListener('click', () => {
-            ipcRenderer.send('end-break');
+        document.getElementById('submit-button').addEventListener('click', () => {
+            const header = document.getElementById('header-input').value;
+            const body = document.getElementById('body-input').value;
+            ipcRenderer.send('manual-break-message', { header, body });
+            ipcRenderer.send('close-popup-window'); // Send message to close the popup window
         });
 
-        // Set manual break message
-        ipcRenderer.on('set-manual-break-message', (event, { header, body }) => {
-            document.getElementById('manual-break-header').innerText = header;
-            document.getElementById('manual-break-body').innerText = body;        
+        ipcRenderer.on('load-manual-break-message', (event, { header, body }) => {
+            document.getElementById('header-input').value = header;
+            document.getElementById('body-input').value = body;
+        });
+
+        ipcRenderer.invoke('get-manual-break-message').then((message) => {
+            ipcRenderer.send('load-manual-break-message', message);
         });
     </script>
 </body>

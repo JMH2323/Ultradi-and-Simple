@@ -11,16 +11,7 @@ console.log(`Current window title: ${windowTitle}`);
 
 // Check if the current window is a break window or the main window
 if (windowTitle.includes('Break')) {
-    const breakType = windowTitle.split(' ')[0].toLowerCase();
-    console.log(`${breakType} break window detected`);
-
-    // Set up auto-close for the break window
-    const timeout = 300000; // Default timeout of 5 minutes
-    console.log(`Break window will close in ${timeout / 1000} seconds`);
-    setTimeout(() => {
-        console.log('Closing break window now');
-        currentWindow.close();
-    }, timeout);
+    console.log('Break window detected');
 } else {
     console.log('Main window detected');
 }
