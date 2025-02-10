@@ -45,13 +45,11 @@ function createMainWindow() {
   mainWindow.webContents.on('before-input-event', (event, input) => {
     if (input.control && input.alt && input.key.toLowerCase() === 'v') {
       console.log('Manual short break triggered');
-      showBreakNotification(BREAK_TYPES.SHORT);
-      setTimeout(() => createBreakWindow(BREAK_TYPES.SHORT), 10000);
+      createBreakWindow(BREAK_TYPES.SHORT)
       event.preventDefault();
     } else if (input.control && input.alt && input.key.toLowerCase() === 'b') {
-      console.log('Manual long break triggered');
-      showBreakNotification(BREAK_TYPES.LONG);
-      setTimeout(() => createBreakWindow(BREAK_TYPES.LONG), 10000);
+      console.log('Manual long break triggered');      
+      createBreakWindow(BREAK_TYPES.LONG)
       event.preventDefault();
     } else if (input.control && input.alt && input.key.toLowerCase() === 'n') {
       console.log('Manual break triggered');      
@@ -69,14 +67,30 @@ function createMainWindow() {
     return false;
   });
 
-  // Create tray icon and menu
+  // Icon functionality in the system tray
   tray = new Tray(path.join(__dirname, '../assets/UAR-Tray.png')); 
   const contextMenu = Menu.buildFromTemplate([
     { label: 'Show App', click: () => mainWindow.show() },
+    { label: 'Skip to Short Break', click: () => {
+        console.log('Skipping to next short break');
+        createBreakWindow(BREAK_TYPES.SHORT);
+      }
+    },
+    { label: 'Skip to Long Break', click: () => {
+        console.log('Skipping to next long break');
+        createBreakWindow(BREAK_TYPES.LONG);
+      }
+    },
+    { label: 'Reset Breaks', click: () => {
+        console.log('Resetting breaks');
+        resetBothBreaks();
+      }
+    },
     { label: 'Quit', click: () => {
-      app.isQuiting = true;
-      app.quit();
-    }}
+        app.isQuiting = true;
+        app.quit();
+      }
+    }
   ]);
   tray.setToolTip('Ultradi and Simple');
   tray.setContextMenu(contextMenu);
@@ -158,10 +172,11 @@ function createBreakWindow(breakType)
          globalShortcut.unregister('Control+X');
       }, settings[`${breakType}Break`].duration - 1000);
 
+      let autoCloseTimeout;
       if (breakType === BREAK_TYPES.SHORT)
       {              
         // Auto-close after duration
-        const autoCloseTimeout = setTimeout(() => 
+        autoCloseTimeout = setTimeout(() => 
           {
             if (breakWindow) breakWindow.close();
             resetShortBreak();         
@@ -173,7 +188,7 @@ function createBreakWindow(breakType)
       breakWindow.on('closed', () => 
         {
           clearTimeout(unregisterShortcutsTimeout);
-          clearTimeout(autoCloseTimeout);
+          if (autoCloseTimeout) clearTimeout(autoCloseTimeout);
           globalShortcut.unregister('Control+S');
           globalShortcut.unregister('Control+X');
           breakWindows = breakWindows.filter(win => win !== breakWindow);
