@@ -403,29 +403,29 @@ ipcMain.on('update-settings', (event, newSettings) => {
   // Calculate intervals and durations
   let shortInterval = (newSettings.shortBreakHours * 3600000) +
                       (newSettings.shortBreakMinutes * 60000) +
-                      (newSettings.shortBreakSeconds * 1000);
+                      (newSettings.shortBreakSeconds * 1000) - 10000; // Subract 10 for the notification
 
   let longInterval = (newSettings.longBreakHours * 3600000) +
                      (newSettings.longBreakMinutes * 60000) +
-                     (newSettings.longBreakSeconds * 1000);
+                     (newSettings.longBreakSeconds * 1000) - 10000; // Subract 10 for the notification
 
   let shortDuration = (newSettings.shortBreakDurationHours * 3600000) +
                       (newSettings.shortBreakDurationMinutes * 60000) +
-                      (newSettings.shortBreakDurationSeconds * 1000);
+                      (newSettings.shortBreakDurationSeconds * 1000)
 
   let longDuration = (newSettings.longBreakDurationHours * 3600000) +
                      (newSettings.longBreakDurationMinutes * 60000) +
-                     (newSettings.longBreakDurationSeconds * 1000);
+                     (newSettings.longBreakDurationSeconds * 1000)
 
   // Apply minimum constraints
   if (shortInterval < 60000) {
     console.log('Short break interval is less than 1 minute. Setting to 1 minute.');
-    shortInterval = 60000; // 1 minute
+    shortInterval = 60000 - 10000; // 1 minute with 10 second notification
   }
 
   if (longInterval < 120000) {
     console.log('Long break interval is less than 2 minutes. Setting to 2 minutes.');
-    longInterval = 120000; // 2 minutes
+    longInterval = 120000 - 10000; // 2 minutes with 10 second notification
   }
 
   if (shortDuration < 1000) {

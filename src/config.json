@@ -1,15 +1,15 @@
 {
   "shortBreak": {
-    "interval": 180000,
-    "duration": 15000
+    "interval": 1200000,
+    "duration": 20000
   },
   "longBreak": {
-    "interval": 300000,
-    "duration": 5000
+    "interval": 5400000,
+    "duration": 900000
   },
   "useLongBreaks": true,
   "manualBreak": {
-    "header": "smelly",
-    "body": "poop"
+    "header": "Lunch",
+    "body": "Hi! I'm AFK at the moment. For emergencies, contact me at XXX-XXX-XXXX"
   }
 }
