@@ -23,6 +23,7 @@ let lastActivityTime = Date.now();
 let isPaused = false;
 let elaspedTimeUntilBreak = 0;
 let shouldReset = false;
+let notificationOnly = false;
 
 // Default settings for break intervals and durations
 let settings = loadSettings();
@@ -92,6 +93,12 @@ function createMainWindow() {
         resetBothBreaks();
       }
     },
+    { label: 'Notification Only: Off', click: (menuItem) => {
+        notificationOnly = !notificationOnly;
+        menuItem.label = `Notification Only: ${notificationOnly ? 'On' : 'Off'}`;
+        console.log(`Notification Only mode is now ${notificationOnly ? 'On' : 'Off'}`);
+      }
+    },
     { label: 'Quit', click: () => {
         app.isQuiting = true;
         app.quit();
@@ -109,6 +116,12 @@ function createMainWindow() {
 
 // Create break windows for each display
 function createBreakWindow(breakType) {
+  
+  if (notificationOnly) {
+    console.log(`Notification only mode is on. Skipping creation of ${breakType} break windows.`);
+    return;
+  }
+
   try {
     console.log(`Creating ${breakType} break windows`);
 
