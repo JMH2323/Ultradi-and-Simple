@@ -1,8 +1,10 @@
+
+const { app } = require('electron');
 const fs = require('fs');
 const path = require('path');
 
 // Path to the config file in the project directory
-const configPath = path.join(__dirname, 'config.json');
+const configPath = path.join(app.getPath('userData'), 'config.json');
 
 // Default settings
 const defaultSettings = {
@@ -18,7 +20,8 @@ const defaultSettings = {
     manualBreak: {
         header: 'Add Header Here',
         body: 'Add Body Here'
-    }
+    },
+    notifcationOnly: false
 };
 
 // Load settings from config.json or use defaults

@@ -4,13 +4,33 @@
     "description": "An Electron app to block off the screen during break reminders",
     "main": "src/main.js",
     "scripts": {
-        "start": "electron ."
+        "start": "electron .",
+        "build": "electron-builder"
+    },
+    "build": {
+        "appId": "com.example.ultradiandsimple",
+        "win": {
+        "target": "nsis",
+        "icon": "assets/UAR-256.png"
+        },
+        "files": [
+        "src/**/*",
+        "node_modules/**/*",
+        "assets/**/*",
+        "package.json"       
+    ],
+        "directories": {
+        "output": "dist"
+        }
     },
     "dependencies": {
         "@electron/remote": "^2.0.10",
-        "electron": "^25.0.0",
         "electron-store": "^10.0.0"
     },
     "author": "John Haley-Clay",
-    "license": "MIT"
+    "license": "MIT",
+    "devDependencies": {
+        "electron": "^25.0.0",
+        "electron-builder": "^26.0.12"
+    }
 }

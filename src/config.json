@@ -1,15 +1,16 @@
 {
   "shortBreak": {
-    "interval": 1200000,
+    "interval": 50000,
     "duration": 20000
   },
   "longBreak": {
-    "interval": 5400000,
+    "interval": 5380000,
     "duration": 900000
   },
-  "useLongBreaks": true,
+  "useLongBreaks": false,
   "manualBreak": {
     "header": "Lunch",
     "body": "Hi! I'm AFK at the moment. For emergencies, contact me at XXX-XXX-XXXX"
-  }
+  },
+  "notificationOnly": true
 }

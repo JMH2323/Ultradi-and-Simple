@@ -118,6 +118,10 @@
         <div class="guidance">
             Minimum time for Short intervals is 1 minute, Long intervals 2 minutes.
         </div>
+        <div class="checkbox-group">
+            <input type="checkbox" id="notification-only-mode">
+            <label for="notification-only-mode">Notification Only Mode</label>
+        </div>
         <button id="start-manual-break">Start Manual Break</button> <!-- button for manual breaks -->
         <button id="save-settings">Save Settings</button>
     </div>
@@ -205,6 +209,22 @@
         ipcRenderer.invoke('get-settings').then((settings) => {
             console.log('Initializing settings:', settings);
             initializeSettings(settings);
+        }).catch((error) => {
+            console.error('Failed to load settings:', error);
+        });     
+
+        // Listen for changes to the Notification Only Mode checkbox
+        document.getElementById('notification-only-mode').addEventListener('change', (event) => {
+        const isNotificationOnly = event.target.checked;
+        console.log('Notification Only Mode:', isNotificationOnly);
+
+        // Send the updated setting to the main process
+        ipcRenderer.send('update-notification-only-mode', isNotificationOnly);
+        });
+
+        // Initialize the Notification Only Mode checkbox based on saved settings
+        ipcRenderer.invoke('get-settings').then((settings) => {
+            document.getElementById('notification-only-mode').checked = settings.notificationOnly || false;
         }).catch((error) => {
             console.error('Failed to load settings:', error);
         });

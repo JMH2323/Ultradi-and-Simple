@@ -24,10 +24,14 @@ let isPaused = false;
 let elaspedTimeUntilBreak = 0;
 let shouldReset = false;
 let notificationOnly = false;
+let notificationTimerId;
+let isNotificationTimerRunning = false;
 
 // Default settings for break intervals and durations
 let settings = loadSettings();
 settings.useLongBreaks = settings.useLongBreaks !== undefined ? settings.useLongBreaks : true; // Default to true
+settings.notificationOnly = settings.notificationOnly !== undefined ? settings.notificationOnly : false;
+
 
 // Create the main application window
 function createMainWindow() {
@@ -40,7 +44,7 @@ function createMainWindow() {
       enableRemoteModule: true
     },
     show: false, // Start hidden
-    icon: path.join(__dirname, 'bin/assets/UAR-Tray.png'),
+    icon: path.join(__dirname, 'bin/assets/UAR-Icon.ico'),
     title: 'Ultradi and Simple Settings'
   });
 
@@ -75,7 +79,7 @@ function createMainWindow() {
   });
 
   // Icon functionality in the system tray
-  tray = new Tray(path.join(__dirname, '../assets/UAR-Tray.png'));
+  tray = new Tray(path.join(__dirname, '../assets/UAR-Icon.ico'));
   const contextMenu = Menu.buildFromTemplate([
     { label: 'Show App', click: () => mainWindow.show() },
     { label: 'Skip to Short Break', click: () => {
@@ -94,11 +98,11 @@ function createMainWindow() {
       }
     },
     { label: 'Notification Only: Off', click: (menuItem) => {
-        notificationOnly = !notificationOnly;
-        menuItem.label = `Notification Only: ${notificationOnly ? 'On' : 'Off'}`;
-        console.log(`Notification Only mode is now ${notificationOnly ? 'On' : 'Off'}`);
-      }
-    },
+      settings.notificationOnly = !settings.notificationOnly;
+      saveSettings(settings);
+      menuItem.label = `Notification Only: ${settings.notificationOnly ? 'On' : 'Off'}`;
+      console.log(`Notification Only Mode is now ${settings.notificationOnly ? 'On' : 'Off'}`);
+    }},
     { label: 'Quit', click: () => {
         app.isQuiting = true;
         app.quit();
@@ -114,13 +118,51 @@ function createMainWindow() {
   });
 }
 
+function setNotificationTimer() {
+
+  // Clear any existing notification timer
+  clearNotificationTimer();
+
+  // Set the flag to indicate the timer is running
+  isNotificationTimerRunning = true;
+
+  // Set a new notification timer
+  notificationTimerId = setInterval(() => {
+    if (settings.notificationOnly) {
+        console.log('Notification Only Mode: Showing short break notification.');
+        showBreakNotificationOnly(BREAK_TYPES.SHORT);
+
+        if (settings.useLongBreaks) {
+            console.log('Notification Only Mode: Showing long break notification.');
+            setTimeout(() => showBreakNotificationOnly(BREAK_TYPES.LONG), settings.longBreak.interval);
+        }
+    }
+  }, settings.shortBreak.interval + 10000);
+};
+
+function clearNotificationTimer() {
+  if (notificationTimerId) {
+      clearInterval(notificationTimerId);
+      notificationTimerId = null;
+      isNotificationTimerRunning = false;
+      console.log('Notification timer cleared.');
+  }
+};
+
 // Create break windows for each display
 function createBreakWindow(breakType) {
   
-  if (notificationOnly) {
-    console.log(`Notification only mode is on. Skipping creation of ${breakType} break windows.`);
+  if (settings.notificationOnly) {
+    console.log(`Notification Only Mode is enabled. Showing notification for ${breakType} break.`);
+    
+    // Cancel other timers to avoid multiple notifications
+    if (shortBreakIntervalId) clearInterval(shortBreakIntervalId);
+    if (longBreakIntervalId) clearInterval(longBreakIntervalId);
+
+    // Show a single notification
+    showBreakNotificationOnly(breakType);
     return;
-  }
+  }                   
 
   try {
     console.log(`Creating ${breakType} break windows`);
@@ -228,6 +270,16 @@ function createManualBreakSetupWindow() {
   });
 }
 
+// Handle Notification mode
+ipcMain.on('update-notification-only-mode', (event, isNotificationOnly) => {
+  settings.notificationOnly = isNotificationOnly;
+  saveSettings(settings); // Save the updated setting
+  console.log('Notification Only Mode updated:', isNotificationOnly);
+
+  // Reset timers based on the new mode
+  setBreakIntervals();
+});
+
 // Handle manual break message submission
 ipcMain.on('manual-break-message', (event, { header, body }) => {
   settings.manualBreak = { header, body };
@@ -302,6 +354,16 @@ ipcMain.on('start-manual-break', () => {
   createManualBreakSetupWindow();
 });
 
+function showBreakNotificationOnly(breakType) {
+  const breakName = breakType.charAt(0).toUpperCase() + breakType.slice(1);
+  new Notification({
+      title: `${breakName} Break`,
+      body: `Time to take your ${breakName.toLowerCase()} break!`,
+      silent: false
+  }).show();
+setNotificationTimer();
+}
+
 // Show a notification for an upcoming break
 function showBreakNotification(breakType) {
   new Notification({
@@ -347,7 +409,7 @@ function postponeBreak() {
 // Function to reset short break interval
 function resetShortBreak() {
   if (shortBreakIntervalId) clearInterval(shortBreakIntervalId);
-  shortBreakIntervalId = setInterval(() => {
+  shortBreakIntervalId = setInterval(() => {  
     if (!breakWindows.length) {
       showBreakNotification(BREAK_TYPES.SHORT);
       setTimeout(() => createBreakWindow(BREAK_TYPES.SHORT), 10000);
@@ -372,6 +434,10 @@ function resetLongBreak() {
 
 // Placeholder for resetBothBreaks function
 function resetBothBreaks() {
+  if (shortBreakIntervalId) clearInterval(shortBreakIntervalId);
+  if (longBreakIntervalId) clearInterval(longBreakIntervalId);
+  clearNotificationTimer(); // Clear the notification timer
+
   resetShortBreak();
   resetLongBreak();
   console.log('Both break intervals reset');
@@ -382,7 +448,16 @@ function setBreakIntervals() {
   // Clear existing intervals
   if (shortBreakIntervalId) clearInterval(shortBreakIntervalId);
   if (longBreakIntervalId) clearInterval(longBreakIntervalId);
+  clearNotificationTimer();
+
   elaspedTimeUntilBreak = 0;
+
+  // Set notification only timer intervals
+  if (settings.notificationOnly) {
+    console.log('Setting notification timers for Notification Only Mode.');
+    setNotificationTimer();
+    return;
+  }
 
   // Set short break interval
   shortBreakIntervalId = setInterval(() => {
@@ -479,8 +554,8 @@ ipcMain.on('close-popup-window', (event) => {
 // Function to check for user inactivity
 function checkUserInactivity() {
 
-  let shortIdleTime = 10000;
-  let longIdleTime = 20000;
+  let shortIdleTime = 300000;
+  let longIdleTime = 500000;
 
   const idleTimeMs = powerMonitor.getSystemIdleTime() * 1000;
   if (!isPaused)
@@ -492,19 +567,20 @@ function checkUserInactivity() {
     isPaused = true;
     clearInterval(shortBreakIntervalId);
     clearInterval(longBreakIntervalId);
+    clearNotificationTimer(); 
     elaspedTimeUntilBreak -= shortIdleTime;
   } 
-  else if (isPaused && idleTimeMs > longIdleTime){
+  else if (isPaused && !shouldReset && idleTimeMs > longIdleTime){
     console.log('User inactive for long idle, resetting breaks on return')
     shouldReset = true;
   }
-  else if (isPaused && !shouldReset && idleTimeMs < 10000) {
+  else if (isPaused && !shouldReset && idleTimeMs < shortIdleTime) {
     console.log('User is active again, resuming breaks');
     isPaused = false;
     // Pass idleTimeMs or any other calculation you wish to subtract
     resumeBreaksWithElapsedTime(elaspedTimeUntilBreak);
   }
-  else if (isPaused && shouldReset && idleTimeMs < 10000) {
+  else if (isPaused && shouldReset && idleTimeMs < shortIdleTime) {
     console.log('User is active again, restarting breaks');
     isPaused = false;
     shouldReset = false;
@@ -550,4 +626,7 @@ app.on('activate', () => {
 
 app.on('will-quit', () => {
   globalShortcut.unregisterAll();
+  if (shortBreakIntervalId) clearInterval(shortBreakIntervalId);
+  if (longBreakIntervalId) clearInterval(longBreakIntervalId);
+  if (notificationTimerId) clearInterval(notificationTimerId);
 });

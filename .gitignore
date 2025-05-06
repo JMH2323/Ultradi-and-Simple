@@ -24,4 +24,4 @@ dist/
 
 # Other
 .env
-src/config.json
+
